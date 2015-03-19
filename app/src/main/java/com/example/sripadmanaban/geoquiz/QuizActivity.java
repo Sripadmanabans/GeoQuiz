@@ -1,9 +1,10 @@
 package com.example.sripadmanaban.geoquiz;
 
 import android.content.Intent;
-import android.os.PersistableBundle;
-import android.support.v7.app.ActionBarActivity;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -17,11 +18,14 @@ public class QuizActivity extends ActionBarActivity {
 
     private static final String TAG = "QuizActivity";
     private static final String KEY_INDEX = "index";
+    private static final String CHEATER = "cheater";
+    private static final String DID_CHEAT = "Did they cheat";
 
     private Button mTrueButton;
     private Button mFalseButton;
     private Button mNextButton;
     private Button mCheatButton;
+
     private TextView mQuestionTextView;
 
     private TrueFalse mQuestionBank[] = new TrueFalse[] {
@@ -34,6 +38,9 @@ public class QuizActivity extends ActionBarActivity {
 
     private int mCurrentIndex = 0;
 
+    private boolean mIsCheater;
+    private boolean mDidCheat[] = new boolean[mQuestionBank.length];
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,6 +50,13 @@ public class QuizActivity extends ActionBarActivity {
 
         if(savedInstanceState != null) {
             mCurrentIndex = savedInstanceState.getInt(KEY_INDEX, 0);
+            mIsCheater = savedInstanceState.getBoolean(CHEATER, false);
+            mDidCheat = savedInstanceState.getBooleanArray(DID_CHEAT);
+        }
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            ActionBar actionBar = getSupportActionBar();
+            actionBar.setSubtitle("Bodies of Water");
         }
 
         mQuestionTextView = (TextView) findViewById(R.id.question_text_view);
@@ -68,6 +82,9 @@ public class QuizActivity extends ActionBarActivity {
             @Override
             public void onClick(View v) {
                 mCurrentIndex = (mCurrentIndex + 1) % mQuestionBank.length;
+                if(!mDidCheat[mCurrentIndex]){
+                    mIsCheater = false;
+                }
                 updateQuestion();
             }
         });
@@ -79,7 +96,7 @@ public class QuizActivity extends ActionBarActivity {
                 Intent i = new Intent(QuizActivity.this, CheatActivity.class);
                 boolean answerIsTrue = mQuestionBank[mCurrentIndex].isTrueQuestion();
                 i.putExtra(CheatActivity.EXTRA_ANSWER_IS_TRUE, answerIsTrue);
-                startActivity(i);
+                startActivityForResult(i, 0);
             }
         });
 
@@ -103,6 +120,8 @@ public class QuizActivity extends ActionBarActivity {
         super.onSaveInstanceState(outState);
         Log.i(TAG, "onSaveInstanceState");
         outState.putInt(KEY_INDEX, mCurrentIndex);
+        outState.putBoolean(CHEATER, mIsCheater);
+        outState.putBooleanArray(DID_CHEAT, mDidCheat);
     }
 
     @Override
@@ -127,6 +146,16 @@ public class QuizActivity extends ActionBarActivity {
     protected void onDestroy() {
         super.onDestroy();
         Log.i(TAG, "onDestroy");
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(data == null) {
+            return;
+        }
+
+        mIsCheater = data.getBooleanExtra(CheatActivity.EXTRA_ANSWER_IS_SHOWN, false);
+        mDidCheat[mCurrentIndex] = mIsCheater;
     }
 
     @Override
@@ -161,12 +190,15 @@ public class QuizActivity extends ActionBarActivity {
 
         int messageResId;
 
-        if(userPressedTrue == answerIsTrue) {
-            messageResId = R.string.correct_toast;
+        if(mDidCheat[mCurrentIndex]) {
+            messageResId = R.string.judgement_toast;
         } else {
-            messageResId = R.string.incorrect_toast;
+            if (userPressedTrue == answerIsTrue) {
+                messageResId = R.string.correct_toast;
+            } else {
+                messageResId = R.string.incorrect_toast;
+            }
         }
-
         Toast.makeText(QuizActivity.this,
                 messageResId,
                 Toast.LENGTH_SHORT).show();
